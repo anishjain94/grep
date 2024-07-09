@@ -1,15 +1,26 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
 )
 
+//TODO: use cobra
+
 func main() {
 
-	args := os.Args
+	flagi := flag.Bool("i", false, "case insensitive search")
+
+	flag.Parse()
+
+	flagconfig := &FlagConfig{
+		FlagI: *flagi,
+	}
+
+	args := sanitizeArgs(os.Args)
 	var inputStr []string
 	var searchStr string
 
@@ -28,18 +39,36 @@ func main() {
 		inputStr = readDataFromSource(os.Stdin)
 	}
 
-	output := naiveGrep(inputStr, searchStr)
+	output := naiveGrep(inputStr, searchStr, flagconfig)
 
 	if len(output) > 0 {
 		fmt.Println(output)
 	}
 }
 
-func naiveGrep(inputStr []string, searchStr string) []string {
+func sanitizeArgs(args []string) []string {
+	var newArgs []string
+
+	for _, val := range args {
+		if !strings.HasPrefix(val, "-") {
+			newArgs = append(newArgs, val)
+		}
+	}
+	return newArgs
+
+}
+
+func naiveGrep(inputStr []string, searchStr string, flagconfig *FlagConfig) []string {
 	var outputLines []string
 	for _, str := range inputStr {
-		if strings.Contains(str, searchStr) {
-			outputLines = append(outputLines, str)
+		if flagconfig != nil && flagconfig.isFlagIEnabled() {
+			if strings.Contains(strings.ToLower(str), strings.ToLower(searchStr)) {
+				outputLines = append(outputLines, str)
+			}
+		} else {
+			if strings.Contains(str, searchStr) {
+				outputLines = append(outputLines, str)
+			}
 		}
 	}
 

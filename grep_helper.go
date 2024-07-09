@@ -39,3 +39,11 @@ func readDataFromSource(r io.Reader) []string {
 	}
 	return inputStr
 }
+
+type FlagConfig struct {
+	FlagI bool //case-inSensitive search
+}
+
+func (flagConfig *FlagConfig) isFlagIEnabled() bool {
+	return flagConfig.FlagI
+}

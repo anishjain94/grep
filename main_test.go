@@ -9,23 +9,32 @@ import (
 
 var testCases = map[string]struct {
 	FileName  string
-	InputStr  string
 	SearchStr string
 	Want      []string
+	Iflag     bool
 }{
 	"Zero matches": {
 		FileName:  "testfile.txt",
 		SearchStr: "someRandomString",
+		Iflag:     false,
 	},
 	"One match": {
 		FileName:  "testfile.txt",
 		SearchStr: "temperature",
 		Want:      []string{"this is temperature."},
+		Iflag:     false,
 	},
 	"Multiple matches": {
 		FileName:  "testfile.txt",
 		SearchStr: "anish",
 		Want:      []string{"this is anish.", "is this anish.", "this is anish?", "anish"},
+		Iflag:     false,
+	},
+	"One match - case insensitive": {
+		FileName:  "testfile.txt",
+		SearchStr: "Temperature",
+		Want:      []string{"this is temperature."},
+		Iflag:     true,
 	},
 }
 
@@ -38,12 +47,11 @@ func TestGrep(t *testing.T) {
 			defer file.Close()
 
 			inputStr := readDataFromSource(file)
+			gotContains := naiveGrep(inputStr, value.SearchStr, &FlagConfig{
+				FlagI: value.Iflag,
+			})
 
-			gotContains := naiveGrep(inputStr, value.SearchStr)
-			gotRegex := regexGrep(inputStr, value.SearchStr)
-
-			if !reflect.DeepEqual(gotContains, value.Want) ||
-				!reflect.DeepEqual(gotRegex, value.Want) {
+			if !reflect.DeepEqual(gotContains, value.Want) {
 				t.Errorf("got %s \n --- want %s ", gotContains, value.Want)
 			}
 		})
@@ -94,11 +102,9 @@ func TestUserInput(t *testing.T) {
 			}()
 
 			inputStr := readDataFromSource(os.Stdin)
-			gotContains := naiveGrep(inputStr, value.SearchStr)
-			gotRegex := regexGrep(inputStr, value.SearchStr)
+			gotContains := naiveGrep(inputStr, value.SearchStr, nil)
 
-			if !reflect.DeepEqual(gotContains, value.Want) ||
-				!reflect.DeepEqual(gotRegex, value.Want) {
+			if !reflect.DeepEqual(gotContains, value.Want) {
 				t.Errorf("got %s \n --- want %s ", gotContains, value.Want)
 			}
 		})
@@ -108,19 +114,14 @@ func TestUserInput(t *testing.T) {
 func BenchmarkTableRegex(b *testing.B) {
 	for key, value := range testCases {
 
-		file, err := os.OpenFile(value.FileName, os.O_RDONLY, 0655)
+		file, err := os.Open(value.FileName)
 		printError(err)
 		defer file.Close()
 		inputStr := readDataFromSource(file)
 
-		b.Run(fmt.Sprintf("regex-%s", key), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				regexGrep(inputStr, value.SearchStr)
-			}
-		})
 		b.Run(fmt.Sprintf("naive-%s", key), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				naiveGrep(inputStr, value.SearchStr)
+				naiveGrep(inputStr, value.SearchStr, nil)
 			}
 		})
 	}
