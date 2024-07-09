@@ -12,6 +12,7 @@ var testCases = map[string]struct {
 	SearchStr string
 	Want      []string
 	Iflag     bool
+	Oflag     string
 }{
 	"Zero matches": {
 		FileName:  "testfile.txt",
@@ -36,6 +37,12 @@ var testCases = map[string]struct {
 		Want:      []string{"this is temperature."},
 		Iflag:     true,
 	},
+	"One_match-Output_file": {
+		FileName:  "testfile.txt",
+		SearchStr: "temperature",
+		Want:      []string{"this is temperature."},
+		Oflag:     "output.txt",
+	},
 }
 
 func TestGrep(t *testing.T) {
@@ -47,13 +54,17 @@ func TestGrep(t *testing.T) {
 			defer file.Close()
 
 			inputStr := readDataFromSource(file)
-			gotContains := naiveGrep(inputStr, value.SearchStr, &FlagConfig{
+			flagConfig := &FlagConfig{
 				FlagI: value.Iflag,
-			})
+				FlagO: value.Oflag,
+			}
+			gotContains := naiveGrep(inputStr, value.SearchStr, flagConfig)
 
 			if !reflect.DeepEqual(gotContains, value.Want) {
 				t.Errorf("got %s \n --- want %s ", gotContains, value.Want)
 			}
+
+			displayResult(gotContains, flagConfig)
 		})
 	}
 }

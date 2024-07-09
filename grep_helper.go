@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"io"
 	"os"
-	"strings"
 )
 
 func printError(err error) {
 	if err != nil {
 		errMsg := err.Error()
+		if os.IsExist(err) {
+			errMsg = "file already exists. Please remove and try again."
+		}
 		println(errMsg)
 		os.Exit(1)
 	}
@@ -52,15 +54,4 @@ func (flagConfig *FlagConfig) isFlagIEnabled() bool {
 
 func (flagConfig *FlagConfig) isFlagOEnabled() bool {
 	return flagConfig.FlagO != ""
-}
-
-func sanitizeArgs(args []string) []string {
-	var newArgs []string
-
-	for _, val := range args {
-		if !strings.HasPrefix(val, "-") {
-			newArgs = append(newArgs, val)
-		}
-	}
-	return newArgs
 }

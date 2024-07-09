@@ -37,6 +37,7 @@ func main() {
 		inputStr = readDataFromSource(file)
 
 	} else if len(args) < 2 {
+		searchStr = args[0]
 		inputStr = readDataFromSource(os.Stdin)
 	}
 
@@ -45,11 +46,10 @@ func main() {
 }
 
 func displayResult(output []string, flagconfig *FlagConfig) {
-
 	var outputDestination io.Writer
 
 	if flagconfig.isFlagOEnabled() {
-		file, err := os.OpenFile(flagconfig.FlagO, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		file, err := os.OpenFile(flagconfig.FlagO, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 		printError(err)
 		defer file.Close()
 
