@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,51 +9,50 @@ import (
 
 func main() {
 
-	toSearch := os.Args[1]
-	filePath := os.Args[2]
-	fileValidations(filePath)
+	args := os.Args
+	var inputStr []string
+	var searchStr string
 
-	output := naiveGrep(filePath, toSearch)
+	if len(args) > 2 {
+		searchStr = args[1]
+		filePath := args[2]
+		fileValidations(filePath)
+
+		file, err := os.Open(filePath)
+		printError(err)
+		defer file.Close()
+
+		inputStr = readDataFromSource(file)
+
+	} else if len(args) == 2 {
+		inputStr = readDataFromSource(os.Stdin)
+	}
+
+	output := naiveGrep(inputStr, searchStr)
 
 	if len(output) > 0 {
 		fmt.Println(output)
 	}
 }
 
-func naiveGrep(filePath string, searchStr string) []string {
-
-	file, err := os.OpenFile(filePath, os.O_RDONLY, 0755)
-	printError(err)
-	defer file.Close()
-
+func naiveGrep(inputStr []string, searchStr string) []string {
 	var outputLines []string
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		currentLine := scanner.Text()
-		if strings.Contains(currentLine, searchStr) {
-			outputLines = append(outputLines, currentLine)
+	for _, str := range inputStr {
+		if strings.Contains(str, searchStr) {
+			outputLines = append(outputLines, str)
 		}
 	}
 
 	return outputLines
 }
 
-func regexGrep(filePath string, searchStr string) []string {
-
-	file, err := os.OpenFile(filePath, os.O_RDONLY, 0755)
-	printError(err)
-	defer file.Close()
-
+func regexGrep(inputStr []string, searchStr string) []string {
 	var outputLines []string
-	scanner := bufio.NewScanner(file)
-
 	re := regexp.MustCompile(searchStr)
 
-	for scanner.Scan() {
-		currentLine := scanner.Text()
-		if re.MatchString(currentLine) {
-			outputLines = append(outputLines, currentLine)
+	for _, str := range inputStr {
+		if re.MatchString(str) {
+			outputLines = append(outputLines, str)
 		}
 	}
 

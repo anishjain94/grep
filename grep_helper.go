@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"io"
 	"os"
 )
 
@@ -26,4 +28,14 @@ func fileValidations(filepath string) {
 		os.Exit(1)
 	}
 
+}
+
+func readDataFromSource(r io.Reader) []string {
+	var inputStr []string
+	reader := bufio.NewScanner(r)
+
+	for reader.Scan() {
+		inputStr = append(inputStr, reader.Text())
+	}
+	return inputStr
 }
