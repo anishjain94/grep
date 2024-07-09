@@ -3,30 +3,31 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
 )
 
-//TODO: use cobra
-
 func main() {
 
 	flagi := flag.Bool("i", false, "case insensitive search")
-
+	flago := flag.String("o", "", "output file")
 	flag.Parse()
 
 	flagconfig := &FlagConfig{
 		FlagI: *flagi,
+		FlagO: *flago,
 	}
 
-	args := sanitizeArgs(os.Args)
+	args := flag.Args()
+
 	var inputStr []string
 	var searchStr string
 
-	if len(args) > 2 {
-		searchStr = args[1]
-		filePath := args[2]
+	if len(args) == 2 {
+		searchStr = args[0]
+		filePath := args[1]
 		fileValidations(filePath)
 
 		file, err := os.Open(filePath)
@@ -35,27 +36,31 @@ func main() {
 
 		inputStr = readDataFromSource(file)
 
-	} else if len(args) == 2 {
+	} else if len(args) < 2 {
 		inputStr = readDataFromSource(os.Stdin)
 	}
 
 	output := naiveGrep(inputStr, searchStr, flagconfig)
-
-	if len(output) > 0 {
-		fmt.Println(output)
-	}
+	displayResult(output, flagconfig)
 }
 
-func sanitizeArgs(args []string) []string {
-	var newArgs []string
+func displayResult(output []string, flagconfig *FlagConfig) {
 
-	for _, val := range args {
-		if !strings.HasPrefix(val, "-") {
-			newArgs = append(newArgs, val)
-		}
+	var outputDestination io.Writer
+
+	if flagconfig.isFlagOEnabled() {
+		file, err := os.OpenFile(flagconfig.FlagO, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		printError(err)
+		defer file.Close()
+
+		outputDestination = file
+	} else {
+		outputDestination = os.Stdout
 	}
-	return newArgs
 
+	for _, value := range output {
+		fmt.Fprint(outputDestination, value+"\n")
+	}
 }
 
 func naiveGrep(inputStr []string, searchStr string, flagconfig *FlagConfig) []string {

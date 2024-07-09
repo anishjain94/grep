@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"os"
+	"strings"
 )
 
 func printError(err error) {
@@ -41,9 +42,25 @@ func readDataFromSource(r io.Reader) []string {
 }
 
 type FlagConfig struct {
-	FlagI bool //case-inSensitive search
+	FlagI bool   //case-inSensitive search
+	FlagO string //output file
 }
 
 func (flagConfig *FlagConfig) isFlagIEnabled() bool {
 	return flagConfig.FlagI
+}
+
+func (flagConfig *FlagConfig) isFlagOEnabled() bool {
+	return flagConfig.FlagO != ""
+}
+
+func sanitizeArgs(args []string) []string {
+	var newArgs []string
+
+	for _, val := range args {
+		if !strings.HasPrefix(val, "-") {
+			newArgs = append(newArgs, val)
+		}
+	}
+	return newArgs
 }
