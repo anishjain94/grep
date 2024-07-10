@@ -18,7 +18,7 @@ func main() {
 	flago := flag.String("o", "", "output file")
 	flag.Parse()
 
-	flagconfig := &FlagConfig{
+	flagConfig := &FlagConfig{
 		FlagI: *flagi,
 		FlagO: *flago,
 	}
@@ -28,6 +28,8 @@ func main() {
 	var output []string
 	var searchStr string
 
+	numOfWorkers := 5
+
 	var wg sync.WaitGroup
 
 	if len(args) == 2 {
@@ -35,34 +37,42 @@ func main() {
 		filePath := args[1]
 		fileValidations(filePath)
 
-		subFiles, _ := getAllfileNames(filePath)
-		ch := make(chan []string, len(subFiles))
+		subFiles := getAllfileNames(filePath)
+		jobs := make(chan string, len(subFiles))
+		result := make(chan []string, len(subFiles))
+
+		for range numOfWorkers {
+			go workers(jobs, result, flagConfig, searchStr)
+		}
 
 		for _, subFileName := range subFiles {
 			wg.Add(1)
-
-			go func(fileName string) {
-				fileMatchedLines := executeGrep(fileName, flagconfig, searchStr)
-				ch <- fileMatchedLines
-			}(subFileName)
+			jobs <- subFileName
 		}
+		close(jobs)
 
 		go func() {
-			for outputFromFiles := range ch {
+			for outputFromFiles := range result {
 				output = append(output, outputFromFiles...)
 				wg.Done()
 			}
 		}()
-
 		wg.Wait()
-		displayResult(output, flagconfig)
+		displayResult(output, flagConfig)
 
 	} else if len(args) < 2 {
 		searchStr = args[0]
 		inputStr = readDataAndMatch(os.Stdin, nil, nil, searchStr)
 
-		output := naiveGrep(inputStr, searchStr, flagconfig)
-		displayResult(output, flagconfig)
+		output := naiveGrep(inputStr, searchStr, flagConfig)
+		displayResult(output, flagConfig)
+	}
+}
+
+func workers(jobs chan string, result chan []string, flagConfig *FlagConfig, searchStr string) {
+	for job := range jobs {
+		fileMatchedLines := executeGrep(job, flagConfig, searchStr)
+		result <- fileMatchedLines
 	}
 }
 
@@ -110,9 +120,8 @@ func naiveGrep(inputStr []string, searchStr string, flagconfig *FlagConfig) []st
 	return outputLines
 }
 
-func getAllfileNames(path string) ([]string, bool) {
+func getAllfileNames(path string) []string {
 	var subFiles []string
-	var isDirectory bool
 
 	filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -120,13 +129,11 @@ func getAllfileNames(path string) ([]string, bool) {
 		}
 		if !d.IsDir() {
 			subFiles = append(subFiles, path)
-		} else {
-			isDirectory = true
 		}
 		return nil
 	})
 
-	return subFiles, isDirectory
+	return subFiles
 }
 
 func regexGrep(inputStr []string, searchStr string) []string {
