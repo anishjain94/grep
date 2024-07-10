@@ -6,11 +6,11 @@ import (
 	"os"
 )
 
-func printError(err error) {
+func handleError(err error) {
 	if err != nil {
 		errMsg := err.Error()
 		if os.IsExist(err) {
-			errMsg = "file already exists. Please remove and try again."
+			errMsg = "file already exists. Please delete and try again."
 		}
 		println(errMsg)
 		os.Exit(1)
@@ -18,12 +18,9 @@ func printError(err error) {
 }
 
 func fileValidations(filepath string) {
-	stat, err := os.Stat(filepath)
+	_, err := os.Stat(filepath)
 
-	if err == nil && stat.IsDir() {
-		println(filepath + " is a directory, instead of a file.")
-		os.Exit(1)
-	} else if err != nil && os.IsNotExist(err) {
+	if err != nil && os.IsNotExist(err) {
 		println(filepath + " No such file")
 		os.Exit(1)
 	} else if err != nil && os.IsPermission(err) {
@@ -33,12 +30,17 @@ func fileValidations(filepath string) {
 
 }
 
-func readDataFromSource(r io.Reader) []string {
+func readDataFromSource(r io.Reader, sourceName *string) []string {
 	var inputStr []string
 	reader := bufio.NewScanner(r)
 
+	var directory string
+	if sourceName != nil {
+		directory = (*sourceName) + ": "
+	}
+
 	for reader.Scan() {
-		inputStr = append(inputStr, reader.Text())
+		inputStr = append(inputStr, directory+reader.Text())
 	}
 	return inputStr
 }

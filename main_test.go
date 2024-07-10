@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TODO: Remove space from all test case names
 var testCases = map[string]struct {
 	FileName  string
 	SearchStr string
@@ -28,8 +29,12 @@ var testCases = map[string]struct {
 	"Multiple matches": {
 		FileName:  "testfile.txt",
 		SearchStr: "anish",
-		Want:      []string{"this is anish.", "is this anish.", "this is anish?", "anish"},
-		Iflag:     false,
+		Want: []string{
+			"this is anish.",
+			"is this anish.",
+			"this is anish?",
+			"anish"},
+		Iflag: false,
 	},
 	"One match - case insensitive": {
 		FileName:  "testfile.txt",
@@ -43,17 +48,26 @@ var testCases = map[string]struct {
 		Want:      []string{"this is temperature."},
 		Oflag:     "output.txt",
 	},
+	"Multiple_matches-fileInput": {
+		FileName:  "root_dir",
+		SearchStr: "anish",
+		Want: []string{
+			"root_dir/parent_dir1/child_dir1/child_dir1_file.txt: this is anish parent_dir1/child_dir1/child_dir1_file.txt",
+			"root_dir/parent_dir1/child_dir1/child_dir1_file.txt: is this anish parent_dir1/child_dir1/child_dir1_file.txt",
+			"root_dir/parent_dir1/child_dir1/child_dir1_file.txt: this is anish? parent_dir1/child_dir1/child_dir1_file.txt",
+			"root_dir/parent_dir2/parent_dir2_file1.txt: this is anish parent_dir2parent_dir2_file1.txt",
+			"root_dir/parent_dir2/parent_dir2_file1.txt: is this anish parent_dir2parent_dir2_file1.txt",
+			"root_dir/parent_dir2/parent_dir2_file1.txt: this is anish? parent_dir2parent_dir2_file1.txt",
+		},
+		Iflag: false,
+	},
 }
 
 func TestGrep(t *testing.T) {
 	for key, value := range testCases {
 		t.Run(key, func(t *testing.T) {
 
-			file, err := os.Open(value.FileName)
-			printError(err)
-			defer file.Close()
-
-			inputStr := readDataFromSource(file)
+			inputStr := fetchAllfilesAndGetContent(value.FileName)
 			flagConfig := &FlagConfig{
 				FlagI: value.Iflag,
 				FlagO: value.Oflag,
@@ -94,15 +108,15 @@ func TestUserInput(t *testing.T) {
 	for key, value := range testCasesUserInput {
 		t.Run(key, func(t *testing.T) {
 			file, err := os.CreateTemp("", "tempfile")
-			printError(err)
+			handleError(err)
 			defer os.Remove(file.Name())
 
 			if _, err := file.Write([]byte(value.InputStr)); err != nil {
-				printError(err)
+				handleError(err)
 			}
 
 			if _, err := file.Seek(0, 0); err != nil {
-				printError(err)
+				handleError(err)
 			}
 
 			oldStdIn := os.Stdin
@@ -112,7 +126,7 @@ func TestUserInput(t *testing.T) {
 				os.Stdin = oldStdIn
 			}()
 
-			inputStr := readDataFromSource(os.Stdin)
+			inputStr := readDataFromSource(os.Stdin, nil)
 			gotContains := naiveGrep(inputStr, value.SearchStr, nil)
 
 			if !reflect.DeepEqual(gotContains, value.Want) {
@@ -126,9 +140,9 @@ func BenchmarkTableRegex(b *testing.B) {
 	for key, value := range testCases {
 
 		file, err := os.Open(value.FileName)
-		printError(err)
+		handleError(err)
 		defer file.Close()
-		inputStr := readDataFromSource(file)
+		inputStr := readDataFromSource(file, nil)
 
 		b.Run(fmt.Sprintf("naive-%s", key), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
