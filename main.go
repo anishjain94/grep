@@ -24,13 +24,11 @@ func main() {
 	}
 
 	args := flag.Args()
-
 	var inputStr []string
 	var output []string
 	var searchStr string
 
 	var wg sync.WaitGroup
-	var mutex sync.Mutex
 
 	if len(args) == 2 {
 		searchStr = args[0]
@@ -38,20 +36,23 @@ func main() {
 		fileValidations(filePath)
 
 		subFiles, _ := getAllfileNames(filePath)
+		ch := make(chan []string, len(subFiles))
 
-		// TODO: limit numbers of goroutines that are spining up.
 		for _, subFileName := range subFiles {
 			wg.Add(1)
 
-			go func(waitGroup *sync.WaitGroup) {
-				defer waitGroup.Done()
-				fileMatchedLines := executeGrep(subFileName, flagconfig, searchStr)
-
-				mutex.Lock()
-				output = append(output, fileMatchedLines...)
-				mutex.Unlock()
-			}(&wg)
+			go func(fileName string) {
+				fileMatchedLines := executeGrep(fileName, flagconfig, searchStr)
+				ch <- fileMatchedLines
+			}(subFileName)
 		}
+
+		go func() {
+			for outputFromFiles := range ch {
+				output = append(output, outputFromFiles...)
+				wg.Done()
+			}
+		}()
 
 		wg.Wait()
 		displayResult(output, flagconfig)
