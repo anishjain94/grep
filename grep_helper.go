@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"os"
+	"strings"
 )
 
 func handleError(err error) {
@@ -30,8 +31,8 @@ func fileValidations(filepath string) {
 
 }
 
-func readDataFromSource(r io.Reader, sourceName *string) []string {
-	var inputStr []string
+func readDataAndMatch(r io.Reader, sourceName *string, flagConfig *FlagConfig, searchStr string) []string {
+	var outputLines []string
 	reader := bufio.NewScanner(r)
 
 	var directory string
@@ -40,9 +41,20 @@ func readDataFromSource(r io.Reader, sourceName *string) []string {
 	}
 
 	for reader.Scan() {
-		inputStr = append(inputStr, directory+reader.Text())
+		inputStr := directory + reader.Text()
+
+		if flagConfig != nil && flagConfig.isFlagIEnabled() {
+			if strings.Contains(strings.ToLower(inputStr), strings.ToLower(searchStr)) {
+				outputLines = append(outputLines, inputStr)
+			}
+		} else {
+			if strings.Contains(inputStr, searchStr) {
+				outputLines = append(outputLines, inputStr)
+			}
+		}
+
 	}
-	return inputStr
+	return outputLines
 }
 
 type FlagConfig struct {

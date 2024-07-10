@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 func main() {
@@ -25,43 +26,52 @@ func main() {
 	args := flag.Args()
 
 	var inputStr []string
+	var output []string
 	var searchStr string
+
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
 
 	if len(args) == 2 {
 		searchStr = args[0]
 		filePath := args[1]
 		fileValidations(filePath)
 
-		inputStr = fetchAllfilesAndGetContent(filePath)
+		subFiles, _ := getAllfileNames(filePath)
+
+		// TODO: limit numbers of goroutines that are spining up.
+		for _, subFileName := range subFiles {
+			wg.Add(1)
+
+			go func(waitGroup *sync.WaitGroup) {
+				defer waitGroup.Done()
+				fileMatchedLines := executeGrep(subFileName, flagconfig, searchStr)
+
+				mutex.Lock()
+				output = append(output, fileMatchedLines...)
+				mutex.Unlock()
+			}(&wg)
+		}
+
+		wg.Wait()
+		displayResult(output, flagconfig)
 
 	} else if len(args) < 2 {
 		searchStr = args[0]
-		inputStr = readDataFromSource(os.Stdin, nil)
-	}
+		inputStr = readDataAndMatch(os.Stdin, nil, nil, searchStr)
 
-	output := naiveGrep(inputStr, searchStr, flagconfig)
-	displayResult(output, flagconfig)
+		output := naiveGrep(inputStr, searchStr, flagconfig)
+		displayResult(output, flagconfig)
+	}
 }
 
-// TODO: Refactor
-func fetchAllfilesAndGetContent(filePath string) []string {
-	var inputStr []string
-	subFiles, isDirectory := walkDir(filePath)
+func executeGrep(subFileName string, flagconfig *FlagConfig, searchStr string) []string {
+	file, err := os.Open(subFileName)
+	handleError(err)
+	defer file.Close()
 
-	for _, subFile := range subFiles {
-		file, err := os.Open(subFile)
-		handleError(err)
-		defer file.Close()
-
-		if isDirectory {
-			fileResult := readDataFromSource(file, &subFile)
-			inputStr = append(inputStr, fileResult...)
-		} else {
-			fileResult := readDataFromSource(file, nil)
-			inputStr = append(inputStr, fileResult...)
-		}
-	}
-	return inputStr
+	fileResult := readDataAndMatch(file, &subFileName, flagconfig, searchStr)
+	return fileResult
 }
 
 func displayResult(output []string, flagconfig *FlagConfig) {
@@ -99,7 +109,7 @@ func naiveGrep(inputStr []string, searchStr string, flagconfig *FlagConfig) []st
 	return outputLines
 }
 
-func walkDir(path string) ([]string, bool) {
+func getAllfileNames(path string) ([]string, bool) {
 	var subFiles []string
 	var isDirectory bool
 
