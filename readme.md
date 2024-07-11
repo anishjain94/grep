@@ -45,13 +45,12 @@ lorem ipsum
 a dummy text usually contains lorem ipsum
 ```
 
-- [-] Ability to search for a string recursively in any of the files in a given directory. When searching in multiple files, the output should indicate the file name and all the output from one file should be grouped together in the final output. (in other words, output from two files shouldn't be interleaved in the final output being printed)
+- [x] Ability to search for a string recursively in any of the files in a given directory. When searching in multiple files, the output should indicate the file name and all the output from one file should be grouped together in the final output. (in other words, output from two files shouldn't be interleaved in the final output being printed)
 
 ```
-$ ./grep "test" tests
-tests/test1.txt:this is a test file
-tests/test1.txt:one can test a program by running test cases
-tests/inner/test2.txt:this file contains a test line
+$ ./grep -r "test" test_files
+test_files/testfile2.txt:this is test 8
+test_files/testfile2.txt:this is test 14
 ```
 
 - [-] Package test

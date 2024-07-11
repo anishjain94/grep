@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"sync"
 )
@@ -46,11 +45,11 @@ func main() {
 		searchStr = args[0]
 		sourceName := "stdin"
 
-		output = readAndMatch(&ReadAndMatchConfigIo{
+		output = readAndMatch(&ReadAndMatchIo{
 			Reader:     os.Stdin,
 			Source:     &sourceName,
 			FlagConfig: flagConfig,
-			SearchStr:  searchStr,
+			Pattern:    searchStr,
 		})
 
 		fileResultMap[sourceName] = output
@@ -67,7 +66,7 @@ func main() {
 		searchStr = args[0]
 		filePath := args[1]
 
-		err := fileValidations(filePath)
+		err := validateFile(filePath)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -131,11 +130,11 @@ func executeGrep(subFileName string, flagconfig *FlagConfigIo, searchStr string)
 	}
 	defer file.Close()
 
-	fileResult := readAndMatch(&ReadAndMatchConfigIo{
+	fileResult := readAndMatch(&ReadAndMatchIo{
 		Reader:     file,
 		Source:     &subFileName,
 		FlagConfig: flagconfig,
-		SearchStr:  searchStr,
+		Pattern:    searchStr,
 	})
 
 	return fileResult, nil
@@ -190,17 +189,4 @@ func listFilesInDir(path string) ([]string, bool, error) {
 	}
 
 	return subFiles, isDir, nil
-}
-
-func regexGrep(inputStr []string, searchStr string) []string {
-	var outputLines []string
-	re := regexp.MustCompile(searchStr)
-
-	for _, str := range inputStr {
-		if re.MatchString(str) {
-			outputLines = append(outputLines, str)
-		}
-	}
-
-	return outputLines
 }

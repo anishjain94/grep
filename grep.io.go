@@ -9,11 +9,11 @@ type DisplayResultIo struct {
 	IsDirectory      bool
 }
 
-type ReadAndMatchConfigIo struct {
+type ReadAndMatchIo struct {
 	Reader     io.Reader
 	Source     *string
 	FlagConfig *FlagConfigIo
-	SearchStr  string
+	Pattern    string
 }
 
 type FlagConfigIo struct {
