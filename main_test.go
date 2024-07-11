@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"slices"
@@ -26,50 +27,50 @@ var testCases = map[string]struct {
 	"oneMatch": {
 		FileName:  "testfile.txt",
 		SearchStr: "temperature",
-		Want:      []string{"testfile.txt: this is temperature."},
+		Want:      []string{"this is temperature."},
 		Iflag:     false,
 	},
 	"fileDoesNotExists": {
 		FileName:  "fileDoesNotExist.txt",
 		SearchStr: "temperature",
-		Want:      []string{"testfile.txt: this is temperature."},
+		Want:      []string{"lstat fileDoesNotExist.txt: no such file or directory"},
 		Iflag:     false,
 	},
 	"multipleMatch": {
 		FileName:  "testfile.txt",
 		SearchStr: "anish",
 		Want: []string{
-			"testfile.txt: this is anish.",
-			"testfile.txt: is this anish.",
-			"testfile.txt: this is anish?",
-			"testfile.txt: anish"},
+			"this is anish.",
+			"is this anish.",
+			"this is anish?",
+			"anish"},
 		Iflag: false,
 	},
 	"oneMatchCaseInsensitive": {
 		FileName:  "testfile.txt",
 		SearchStr: "Temperature",
-		Want:      []string{"testfile.txt: this is temperature."},
+		Want:      []string{"this is temperature."},
 		Iflag:     true,
 	},
 	"oneMatchOutputFile": {
 		FileName:  "testfile.txt",
 		SearchStr: "temperature",
-		Want:      []string{"testfile.txt: this is temperature."},
+		Want:      []string{"this is temperature."},
 		Oflag:     "output.txt",
 	},
-	"multipleMatchesFileinput": {
+	"multipleMatchesDirectory": {
 		FileName:  "root_dir",
 		SearchStr: "anish",
 		Want: []string{
-			"root_dir/parent_dir1/child_dir2/child_dir2_file.txt: this is anish parent_dir1/child_dir1/child_dir1_file.txt",
-			"root_dir/parent_dir1/child_dir2/child_dir2_file.txt: is this anish parent_dir1/child_dir1/child_dir1_file.txt",
-			"root_dir/parent_dir1/child_dir2/child_dir2_file.txt: this is anish? parent_dir1/child_dir1/child_dir1_file.txt",
-			"root_dir/parent_dir2/parent_dir2_file1.txt: this is anish parent_dir2/parent_dir2_file1.txt",
-			"root_dir/parent_dir2/parent_dir2_file1.txt: is this anish parent_dir2/parent_dir2_file1.txt",
-			"root_dir/parent_dir2/parent_dir2_file1.txt: this is anish? parent_dir2/parent_dir2_file1.txt",
-			"root_dir/parent_dir1/child_dir1/child_dir1_file.txt: this is anish parent_dir1/child_dir1/child_dir1_file.txt",
-			"root_dir/parent_dir1/child_dir1/child_dir1_file.txt: is this anish parent_dir1/child_dir1/child_dir1_file.txt",
-			"root_dir/parent_dir1/child_dir1/child_dir1_file.txt: this is anish? parent_dir1/child_dir1/child_dir1_file.txt",
+			"this is anish parent_dir1/child_dir1/child_dir1_file.txt",
+			"is this anish parent_dir1/child_dir1/child_dir1_file.txt",
+			"this is anish? parent_dir1/child_dir1/child_dir1_file.txt",
+			"this is anish parent_dir2/parent_dir2_file1.txt",
+			"is this anish parent_dir2/parent_dir2_file1.txt",
+			"this is anish? parent_dir2/parent_dir2_file1.txt",
+			"this is anish parent_dir1/child_dir2/child_dir2_file.txt",
+			"is this anish parent_dir1/child_dir2/child_dir2_file.txt",
+			"this is anish? parent_dir1/child_dir2/child_dir2_file.txt",
 		},
 		Iflag: false,
 	},
@@ -80,18 +81,31 @@ func TestGrep(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 
 			var got []string
-			flagConfig := &FlagConfig{
-				FlagI: value.Iflag,
-				FlagO: value.Oflag,
+			flagConfig := &FlagConfigIo{
+				CaseInSensitiveSearch: value.Iflag,
+				OutputFileName:        value.Oflag,
 			}
-			subFiles := getAllfileNames(value.FileName)
+			subFiles, _, err := listFilesInDir(value.FileName)
+			if err != nil {
+				if err.Error() != value.Want[0] {
+					t.Errorf("got %s \n --- want %s ", err.Error(), value.Want[0])
+				}
+				return
+			}
 
 			for _, subFileName := range subFiles {
 				file, err := os.Open(subFileName)
-				handleError(err)
+				if err != nil {
+					panic(err.Error())
+				}
 				defer file.Close()
 
-				fileResult := readDataAndMatch(file, &subFileName, flagConfig, value.SearchStr)
+				fileResult := readAndMatch(&ReadAndMatchConfigIo{
+					Reader:     file,
+					Source:     &subFileName,
+					FlagConfig: flagConfig,
+					SearchStr:  value.SearchStr,
+				})
 				got = append(got, fileResult...)
 			}
 
@@ -102,7 +116,7 @@ func TestGrep(t *testing.T) {
 				t.Errorf("got %s \n --- want %s ", got, value.Want)
 			}
 
-			displayResult(got, flagConfig)
+			// displayResult(got, flagConfig, nil, false)
 		})
 	}
 }
@@ -132,15 +146,17 @@ func TestUserInput(t *testing.T) {
 	for key, value := range testCasesUserInput {
 		t.Run(key, func(t *testing.T) {
 			file, err := os.CreateTemp("", "tempfile")
-			handleError(err)
+			if err != nil {
+				log.Panic(err)
+			}
 			defer os.Remove(file.Name())
 
 			if _, err := file.Write([]byte(value.InputStr)); err != nil {
-				handleError(err)
+				log.Panic(err)
 			}
 
 			if _, err := file.Seek(0, 0); err != nil {
-				handleError(err)
+				log.Panic(err)
 			}
 
 			oldStdIn := os.Stdin
@@ -150,11 +166,18 @@ func TestUserInput(t *testing.T) {
 				os.Stdin = oldStdIn
 			}()
 
-			inputStr := readDataAndMatch(os.Stdin, nil, nil, value.SearchStr)
-			gotContains := naiveGrep(inputStr, value.SearchStr, nil)
+			sourceName := "stdin"
+			gotResult := readAndMatch(
+				&ReadAndMatchConfigIo{
+					Reader:     os.Stdin,
+					Source:     &sourceName,
+					FlagConfig: nil,
+					SearchStr:  value.SearchStr,
+				},
+			)
 
-			if !reflect.DeepEqual(gotContains, value.Want) {
-				t.Errorf("got %s \n --- want %s ", gotContains, value.Want)
+			if !reflect.DeepEqual(gotResult, value.Want) {
+				t.Errorf("got %s \n --- want %s ", gotResult, value.Want)
 			}
 		})
 	}
@@ -162,32 +185,19 @@ func TestUserInput(t *testing.T) {
 
 func BenchmarkTableRegex(b *testing.B) {
 	for key, value := range testCases {
-
 		file, err := os.Open(value.FileName)
-		handleError(err)
+		log.Panic(err)
 		defer file.Close()
 
 		b.Run(fmt.Sprintf("naive-%s", key), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				inputStr := readDataAndMatch(file, nil, nil, value.SearchStr)
-				naiveGrep(inputStr, value.SearchStr, nil)
+				readAndMatch(&ReadAndMatchConfigIo{
+					Reader:     file,
+					Source:     nil,
+					FlagConfig: nil,
+					SearchStr:  value.SearchStr,
+				})
 			}
 		})
 	}
 }
-
-// // func BenchmarkGrepString(b *testing.B) {
-// // 	fileName := "testfile.txt"
-// // 	searchStr := "anish"
-// // 	for i := 0; i < b.N; i++ {
-// // 		naiveGrep(fileName, searchStr)
-// // 	}
-// // }
-
-// // func BenchmarkGrepRegex(b *testing.B) {
-// // 	fileName := "testfile.txt"
-// // 	searchStr := "anish"
-// // 	for i := 0; i < b.N; i++ {
-// // 		regexGrep(fileName, searchStr)
-// // 	}
-// // }
