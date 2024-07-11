@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
+	"strconv"
 	"sync"
 )
 
@@ -16,63 +17,90 @@ func main() {
 
 	flagi := flag.Bool("i", false, "case insensitive search")
 	flago := flag.String("o", "", "output file")
+	flagC := flag.Bool("c", false, "displays count of matches instead of actual matched lines")
+	flagA := flag.Int("a", 0, "displays n lines before the match")
+	flagB := flag.Int("b", 0, "displays n lines after the match")
+
 	flag.Parse()
 
 	flagConfig := &FlagConfig{
 		FlagI: *flagi,
 		FlagO: *flago,
+		FlagC: *flagC,
+		FlagA: *flagA,
+		FlagB: *flagB,
 	}
 
 	args := flag.Args()
-	var inputStr []string
 	var output []string
 	var searchStr string
 
 	numOfWorkers := 5
 
 	var wg sync.WaitGroup
+	var fileResultMap = map[string][]string{}
+
+	if len(args) == 0 {
+		log.Println("Usage: ./grep search_query filename.txt")
+		os.Exit(1)
+	}
+
+	if len(args) == 1 {
+		searchStr = args[0]
+		output = readMatchAndStore(os.Stdin, nil, nil, searchStr)
+
+		fileResultMap[""] = output
+		displayResult(fileResultMap, flagConfig, nil, false)
+	}
 
 	if len(args) == 2 {
 		searchStr = args[0]
 		filePath := args[1]
-		fileValidations(filePath)
 
-		subFiles := getAllfileNames(filePath)
-		jobs := make(chan string, len(subFiles))
-		result := make(chan []string, len(subFiles))
+		err := fileValidations(filePath)
+		handleError(err)
+
+		filesToBeSearched, isDirectory := listFilesInDir(filePath)
+		jobs := make(chan string, len(filesToBeSearched))
+		result := make(chan map[string][]string, len(filesToBeSearched)) //NOTE: Keeping a map here to make the output consisent with multiple goroutines.
 
 		for range numOfWorkers {
 			go workers(jobs, result, flagConfig, searchStr)
 		}
 
-		for _, subFileName := range subFiles {
-			wg.Add(1)
-			jobs <- subFileName
+		wg.Add(len(filesToBeSearched))
+		for _, fileToBeSearched := range filesToBeSearched {
+			fileResultMap[fileToBeSearched] = []string{} //Adding file path to map
+			jobs <- fileToBeSearched
 		}
 		close(jobs)
 
-		go func() {
-			for outputFromFiles := range result {
-				output = append(output, outputFromFiles...)
-				wg.Done()
-			}
-		}()
-		wg.Wait()
-		displayResult(output, flagConfig)
-
-	} else if len(args) < 2 {
-		searchStr = args[0]
-		inputStr = readDataAndMatch(os.Stdin, nil, nil, searchStr)
-
-		output := naiveGrep(inputStr, searchStr, flagConfig)
-		displayResult(output, flagConfig)
+		gatherResult(result, fileResultMap, &wg)
+		displayResult(fileResultMap, flagConfig, filesToBeSearched, isDirectory)
 	}
+
 }
 
-func workers(jobs chan string, result chan []string, flagConfig *FlagConfig, searchStr string) {
+func gatherResult(result chan map[string][]string, fileResultMap map[string][]string, wg *sync.WaitGroup) {
+	go func() {
+		for outputFromFiles := range result {
+			for key, value := range outputFromFiles {
+				fileResultMap[key] = value
+			}
+			wg.Done()
+		}
+	}()
+	wg.Wait()
+}
+
+func workers(jobs chan string, result chan map[string][]string, flagConfig *FlagConfig, searchStr string) {
 	for job := range jobs {
 		fileMatchedLines := executeGrep(job, flagConfig, searchStr)
-		result <- fileMatchedLines
+
+		fileResultMap := map[string][]string{
+			job: fileMatchedLines,
+		}
+		result <- fileResultMap
 	}
 }
 
@@ -81,12 +109,12 @@ func executeGrep(subFileName string, flagconfig *FlagConfig, searchStr string) [
 	handleError(err)
 	defer file.Close()
 
-	fileResult := readDataAndMatch(file, &subFileName, flagconfig, searchStr)
+	fileResult := readMatchAndStore(file, &subFileName, flagconfig, searchStr)
 	return fileResult
 }
 
-func displayResult(output []string, flagconfig *FlagConfig) {
-	var outputDestination io.Writer
+func displayResult(output map[string][]string, flagconfig *FlagConfig, fileOrder []string, isDirectory bool) {
+	var outputDestination io.Writer = os.Stdout
 
 	if flagconfig.isFlagOEnabled() {
 		file, err := os.OpenFile(flagconfig.FlagO, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
@@ -94,46 +122,44 @@ func displayResult(output []string, flagconfig *FlagConfig) {
 		defer file.Close()
 
 		outputDestination = file
-	} else {
-		outputDestination = os.Stdout
 	}
 
-	for _, value := range output {
-		fmt.Fprint(outputDestination, value+"\n")
+	if len(fileOrder) == 0 {
+		fileOrder = []string{""}
 	}
-}
 
-func naiveGrep(inputStr []string, searchStr string, flagconfig *FlagConfig) []string {
-	var outputLines []string
-	for _, str := range inputStr {
-		if flagconfig != nil && flagconfig.isFlagIEnabled() {
-			if strings.Contains(strings.ToLower(str), strings.ToLower(searchStr)) {
-				outputLines = append(outputLines, str)
+	for _, files := range fileOrder {
+		if flagconfig.isFlagCEnabled() {
+			fmt.Fprint(outputDestination, strconv.Itoa(len(output))+"\n")
+			continue
+		}
+		for _, value := range output[files] {
+			valueToPrint := value
+			if isDirectory {
+				valueToPrint = files + ": " + value
 			}
-		} else {
-			if strings.Contains(str, searchStr) {
-				outputLines = append(outputLines, str)
-			}
+
+			fmt.Fprint(outputDestination, valueToPrint+"\n")
 		}
 	}
-
-	return outputLines
 }
 
-func getAllfileNames(path string) []string {
+func listFilesInDir(path string) ([]string, bool) {
 	var subFiles []string
-
+	var isDir bool
 	filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			handleError(err)
 		}
 		if !d.IsDir() {
 			subFiles = append(subFiles, path)
+		} else {
+			isDir = true
 		}
 		return nil
 	})
 
-	return subFiles
+	return subFiles, isDir
 }
 
 func regexGrep(inputStr []string, searchStr string) []string {

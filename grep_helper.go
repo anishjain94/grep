@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"io"
+	"log"
 	"os"
 	"strings"
 )
@@ -13,25 +14,26 @@ func handleError(err error) {
 		if os.IsExist(err) {
 			errMsg = "file already exists. Please delete and try again."
 		}
-		println(errMsg)
+		log.Print(errMsg)
 		os.Exit(1)
 	}
 }
 
-func fileValidations(filepath string) {
+func fileValidations(filepath string) error {
 	_, err := os.Stat(filepath)
 
 	if err != nil && os.IsNotExist(err) {
-		println(filepath + " No such file")
-		os.Exit(1)
-	} else if err != nil && os.IsPermission(err) {
-		println(filepath + " Permission denied")
-		os.Exit(1)
+		log.Print(filepath + " No such file")
+		return err
+	} else if os.IsPermission(err) {
+		log.Print(filepath + " Permission denied")
+		return err
 	}
 
+	return nil
 }
 
-func readDataAndMatch(r io.Reader, sourceName *string, flagConfig *FlagConfig, searchStr string) []string {
+func readMatchAndStore(r io.Reader, sourceName *string, flagConfig *FlagConfig, searchStr string) []string {
 	var outputLines []string
 	reader := bufio.NewScanner(r)
 
@@ -43,29 +45,42 @@ func readDataAndMatch(r io.Reader, sourceName *string, flagConfig *FlagConfig, s
 	for reader.Scan() {
 		inputStr := directory + reader.Text()
 
-		if flagConfig != nil && flagConfig.isFlagIEnabled() {
-			if strings.Contains(strings.ToLower(inputStr), strings.ToLower(searchStr)) {
-				outputLines = append(outputLines, inputStr)
-			}
-		} else {
-			if strings.Contains(inputStr, searchStr) {
-				outputLines = append(outputLines, inputStr)
-			}
+		if flagConfig.isFlagIEnabled() {
+			inputStr = strings.ToLower(inputStr)
+			searchStr = strings.ToLower(searchStr)
 		}
 
+		if strings.Contains(inputStr, searchStr) {
+			outputLines = append(outputLines, reader.Text())
+		}
 	}
 	return outputLines
 }
 
 type FlagConfig struct {
 	FlagI bool   //case-inSensitive search
+	FlagC bool   //displays count of matches
+	FlagA int    //displays n lines before the match
+	FlagB int    //displays n lines after the match
 	FlagO string //output file
 }
 
+func (flagConfig *FlagConfig) isFlagAEnabled() bool {
+	return flagConfig != nil && flagConfig.FlagA != 0
+}
+
+func (flagConfig *FlagConfig) isFlagBEnabled() bool {
+	return flagConfig != nil && flagConfig.FlagB != 0
+}
+
+func (flagConfig *FlagConfig) isFlagCEnabled() bool {
+	return flagConfig != nil && flagConfig.FlagC
+}
+
 func (flagConfig *FlagConfig) isFlagIEnabled() bool {
-	return flagConfig.FlagI
+	return flagConfig != nil && flagConfig.FlagI
 }
 
 func (flagConfig *FlagConfig) isFlagOEnabled() bool {
-	return flagConfig.FlagO != ""
+	return flagConfig != nil && flagConfig.FlagO != ""
 }
