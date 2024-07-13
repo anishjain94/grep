@@ -4,20 +4,19 @@ import "io"
 
 type DisplayResultIo struct {
 	matchedResultMap map[string][]string
-	FlagConfig       *FlagConfigIo
+	FlagConfig       *GrepConfigIo
 	FilesInDirectory []string
 	IsDirectory      bool
 }
 
 type ReadAndMatchIo struct {
 	Reader     io.Reader
-	Source     *string
-	FlagConfig *FlagConfigIo
+	FlagConfig *GrepConfigIo
 	Pattern    string
 }
 
-type FlagConfigIo struct {
-	CaseInSensitiveSearch   bool   //case-inSensitive search
+type GrepConfigIo struct {
+	CaseInsensitiveSearch   bool   //case-inSensitive search
 	CountOfMatches          bool   //displays count of matches
 	CountOfLinesBeforeMatch int    //displays n lines before the match
 	CountOfLinesAfterMatch  int    //displays n lines after the match
@@ -26,22 +25,22 @@ type FlagConfigIo struct {
 
 type FileResultMap map[string][]string
 
-func (flagConfig *FlagConfigIo) shouldDisplayLinesBeforeMatch() bool {
+func (flagConfig *GrepConfigIo) shouldDisplayLinesBeforeMatch() bool {
 	return flagConfig != nil && flagConfig.CountOfLinesBeforeMatch != 0
 }
 
-func (flagConfig *FlagConfigIo) shouldDisplayLinesAfterMatch() bool {
+func (flagConfig *GrepConfigIo) shouldDisplayLinesAfterMatch() bool {
 	return flagConfig != nil && flagConfig.CountOfLinesAfterMatch != 0
 }
 
-func (flagConfig *FlagConfigIo) shouldShowCount() bool {
+func (flagConfig *GrepConfigIo) shouldShowCount() bool {
 	return flagConfig != nil && flagConfig.CountOfMatches
 }
 
-func (flagConfig *FlagConfigIo) shouldSearchCaseInsensitive() bool {
-	return flagConfig != nil && flagConfig.CaseInSensitiveSearch
+func (flagConfig *GrepConfigIo) shouldSearchCaseInsensitive() bool {
+	return flagConfig != nil && flagConfig.CaseInsensitiveSearch
 }
 
-func (flagConfig *FlagConfigIo) shouldStoreOutput() bool {
+func (flagConfig *GrepConfigIo) shouldStoreOutput() bool {
 	return flagConfig != nil && flagConfig.OutputFileName != ""
 }
