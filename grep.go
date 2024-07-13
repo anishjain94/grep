@@ -99,7 +99,11 @@ func displayResult(dataIo *DisplayResultIo) error {
 
 	for _, filePath := range dataIo.FilesInDirectory {
 		if dataIo.FlagConfig.shouldShowCount() {
-			fmt.Fprintln(writer, strconv.Itoa(len(dataIo.matchedResultMap)))
+			valueToPrint := strconv.Itoa(len(dataIo.matchedResultMap))
+			if dataIo.IsDirectory {
+				valueToPrint = filePath + ": " + valueToPrint
+			}
+			fmt.Fprintln(writer, valueToPrint)
 			continue
 		}
 		for _, value := range dataIo.matchedResultMap[filePath] {
