@@ -10,7 +10,6 @@ https://github.com/user-attachments/assets/61de835e-db48-450f-9026-4e1f9872c863
 
 https://github.com/user-attachments/assets/37226aa3-dedb-46de-a29b-e73ba7076f5d
 
-
 #### Features required and status
 
 - [x] Ability to search for a string in a file
