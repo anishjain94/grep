@@ -1,78 +1,72 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"reflect"
 	"testing"
 )
 
-// TODO: write seperate test files for there spefici files/modules..
-// TODO: handle for condition when file limit opening is restricted by os. make is os independent.
-// TODO: How to write test case for permission denied. ex - a directory exists in test_files, which does not have read permission, now because of this..my other test cases were failing..
-// TODO: How are you load-testing your implementation of grep
-
-var testCases = map[string]struct {
-	FileName     string
-	SearchStr    string
-	Want         []string
-	flagConfigIo GrepConfigIo
+var grepTestCases = map[string]struct {
+	FileName      string
+	SearchPattern string
+	Want          []string
+	flagConfigIo  GrepConfig
 }{
 	"zeroMatch": {
-		FileName:  "test_files/testfile.txt",
-		SearchStr: "someRandomString",
-		flagConfigIo: GrepConfigIo{
+		FileName:      "test_files/testfile.txt",
+		SearchPattern: "someRandomString",
+		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: false,
 		},
 	},
 	"oneMatch": {
-		FileName:  "test_files/testfile.txt",
-		SearchStr: "temperature",
-		Want:      []string{"this is temperature."},
-		flagConfigIo: GrepConfigIo{
+		FileName:      "test_files/testfile.txt",
+		SearchPattern: "temperature",
+		Want:          []string{"this is temperature."},
+		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: false,
 		},
 	},
 	"fileDoesNotExists": {
-		FileName:  "fileDoesNotExist.txt",
-		SearchStr: "temperature",
-		Want:      []string{"lstat fileDoesNotExist.txt: no such file or directory"},
-		flagConfigIo: GrepConfigIo{
+		FileName:      "fileDoesNotExist.txt",
+		SearchPattern: "temperature",
+		Want:          []string{"lstat fileDoesNotExist.txt: no such file or directory"},
+		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: false,
 		},
 	},
 	"multipleMatch": {
-		FileName:  "test_files/testfile.txt",
-		SearchStr: "anish",
+		FileName:      "test_files/testfile.txt",
+		SearchPattern: "anish",
 		Want: []string{
 			"this is anish.",
 			"is this anish.",
 			"this is anish?",
 			"anish"},
-		flagConfigIo: GrepConfigIo{
+		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: false,
 		},
 	},
 	"oneMatchCaseInsensitive": {
-		FileName:  "test_files/testfile.txt",
-		SearchStr: "Temperature",
-		Want:      []string{"this is temperature."},
-		flagConfigIo: GrepConfigIo{
+		FileName:      "test_files/testfile.txt",
+		SearchPattern: "Temperature",
+		Want:          []string{"this is temperature."},
+		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: true,
 		},
 	},
 	"oneMatchOutputFile": {
-		FileName:  "test_files/testfile.txt",
-		SearchStr: "temperature",
-		Want:      []string{"this is temperature."},
-		flagConfigIo: GrepConfigIo{
+		FileName:      "test_files/testfile.txt",
+		SearchPattern: "temperature",
+		Want:          []string{"this is temperature."},
+		flagConfigIo: GrepConfig{
 			OutputFileName: "output.txt",
 		},
 	},
 	"multipleMatchesDirectory": {
-		FileName:  "test_files",
-		SearchStr: "anish",
+		FileName:      "test_files",
+		SearchPattern: "anish",
 		Want: []string{
 			"this is anish parent_dir1/child_dir1/child_dir1_file.txt",
 			"is this anish parent_dir1/child_dir1/child_dir1_file.txt",
@@ -88,13 +82,14 @@ var testCases = map[string]struct {
 			"this is anish?",
 			"anish",
 		},
-		flagConfigIo: GrepConfigIo{
+		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: false,
+			ResurciveSearch:       true,
 		},
 	},
-	"NLinesBefore": {
-		FileName:  "test_files/testfile2.txt",
-		SearchStr: "test",
+	"nLinesBefore": {
+		FileName:      "test_files/testfile2.txt",
+		SearchPattern: "test",
 		Want: []string{
 			"this is line 6",
 			"this is line 7",
@@ -105,13 +100,13 @@ var testCases = map[string]struct {
 			"this is test 15",
 			"this is test 16",
 		},
-		flagConfigIo: GrepConfigIo{
+		flagConfigIo: GrepConfig{
 			CountOfLinesBeforeMatch: 2,
 		},
 	},
-	"NLinesAfer": {
-		FileName:  "test_files/testfile2.txt",
-		SearchStr: "test",
+	"nLinesAfer": {
+		FileName:      "test_files/testfile2.txt",
+		SearchPattern: "test",
 		Want: []string{
 			"this is test 8",
 			"this is line 9",
@@ -122,14 +117,74 @@ var testCases = map[string]struct {
 			"this is line 17",
 			"this is line 18",
 		},
-		flagConfigIo: GrepConfigIo{
+		flagConfigIo: GrepConfig{
 			CountOfLinesAfterMatch: 2,
+		},
+	},
+	"multipleFlagsOne": {
+		FileName:      "test_files",
+		SearchPattern: "Test",
+		Want: []string{
+			"this is line 6",
+			"this is line 7",
+			"this is test 8",
+			"this is line 9",
+			"this is line 12",
+			"this is line 13",
+			"this is test 14",
+			"this is test 15",
+			"this is test 16",
+			"this is line 17",
+		},
+		flagConfigIo: GrepConfig{
+			CaseInsensitiveSearch:   true,
+			CountOfLinesBeforeMatch: 2,
+			CountOfLinesAfterMatch:  1,
+			ResurciveSearch:         true,
+		},
+	},
+	"multipleFlagsTwo": {
+		FileName:      "test_files",
+		SearchPattern: "test",
+		Want: []string{
+			"this is line 6",
+			"this is line 7",
+			"this is test 8",
+			"this is line 12",
+			"this is line 13",
+			"this is test 14",
+			"this is test 15",
+			"this is test 16",
+		},
+		flagConfigIo: GrepConfig{
+			CaseInsensitiveSearch:   true,
+			CountOfLinesBeforeMatch: 2,
+			ResurciveSearch:         true,
+		},
+	},
+	"multipleFlagsThree": {
+		FileName:      "test_files",
+		SearchPattern: "test",
+		Want: []string{
+			"this is test 8",
+			"this is line 9",
+			"this is line 10",
+			"this is test 14",
+			"this is test 15",
+			"this is test 16",
+			"this is line 17",
+			"this is line 18",
+		},
+		flagConfigIo: GrepConfig{
+			CaseInsensitiveSearch:  true,
+			CountOfLinesAfterMatch: 2,
+			ResurciveSearch:        true,
 		},
 	},
 }
 
 func TestGrep(t *testing.T) {
-	for key, value := range testCases {
+	for key, value := range grepTestCases {
 		t.Run(key, func(t *testing.T) {
 
 			var got []string
@@ -148,10 +203,10 @@ func TestGrep(t *testing.T) {
 				}
 				defer file.Close()
 
-				fileResult, _ := readAndMatch(&ReadAndMatchIo{
+				fileResult, _ := readAndMatch(&ReadAndMatchInput{
 					Reader:     file,
 					FlagConfig: &value.flagConfigIo,
-					Pattern:    value.SearchStr,
+					Pattern:    value.SearchPattern,
 				})
 				got = append(got, fileResult...)
 			}
@@ -164,29 +219,29 @@ func TestGrep(t *testing.T) {
 	}
 }
 
-var testCasesUserInput = map[string]struct {
-	InputStr  string
-	SearchStr string
-	Want      []string
+var userInputTestCases = map[string]struct {
+	Input         string
+	SearchPattern string
+	Want          []string
 }{
-	"zero matches": {
-		InputStr:  "this does not contain the word.\nthis is empty",
-		SearchStr: "someRandomString",
+	"zeroMatches": {
+		Input:         "this does not contain the word.\nthis is empty",
+		SearchPattern: "someRandomString",
 	},
-	"one match": {
-		InputStr:  "this is temperature.\nthis is one match",
-		SearchStr: "temperature",
-		Want:      []string{"this is temperature."},
+	"oneMatch": {
+		Input:         "this is temperature.\nthis is one match",
+		SearchPattern: "temperature",
+		Want:          []string{"this is temperature."},
 	},
-	"multiple matches": {
-		InputStr:  "this is anish.\nis this anish.\nthis is anish?\nanish",
-		SearchStr: "anish",
-		Want:      []string{"this is anish.", "is this anish.", "this is anish?", "anish"},
+	"multipleMatches": {
+		Input:         "this is anish.\nis this anish.\nthis is anish?\nanish",
+		SearchPattern: "anish",
+		Want:          []string{"this is anish.", "is this anish.", "this is anish?", "anish"},
 	},
 }
 
 func TestUserInput(t *testing.T) {
-	for key, value := range testCasesUserInput {
+	for key, value := range userInputTestCases {
 		t.Run(key, func(t *testing.T) {
 			file, err := os.CreateTemp("", "tempfile")
 			if err != nil {
@@ -194,7 +249,7 @@ func TestUserInput(t *testing.T) {
 			}
 			defer os.Remove(file.Name())
 
-			if _, err := file.Write([]byte(value.InputStr)); err != nil {
+			if _, err := file.Write([]byte(value.Input)); err != nil {
 				log.Fatalf(err.Error())
 			}
 
@@ -210,13 +265,13 @@ func TestUserInput(t *testing.T) {
 			}()
 
 			gotResult, _ := readAndMatch(
-				&ReadAndMatchIo{
+				&ReadAndMatchInput{
 					Reader: os.Stdin,
-					FlagConfig: &GrepConfigIo{
+					FlagConfig: &GrepConfig{
 						CountOfLinesBeforeMatch: 0,
 						CountOfLinesAfterMatch:  0,
 					},
-					Pattern: value.SearchStr,
+					Pattern: value.SearchPattern,
 				},
 			)
 
@@ -228,44 +283,44 @@ func TestUserInput(t *testing.T) {
 }
 
 func BenchmarkTableRegex(b *testing.B) {
-	for key, value := range testCases {
-		b.Run(fmt.Sprintf("naive-%s", key), func(b *testing.B) {
+	for key, value := range grepTestCases {
+		b.Run(key, func(b *testing.B) {
 			file, err := os.Open(value.FileName)
-			log.Fatalf(err.Error())
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
 			defer file.Close()
 
 			for i := 0; i < b.N; i++ {
-				readAndMatch(&ReadAndMatchIo{
-					Reader: file,
-					FlagConfig: &GrepConfigIo{
-						CountOfLinesBeforeMatch: 0,
-						CountOfLinesAfterMatch:  0,
-					},
-					Pattern: value.SearchStr,
+				readAndMatch(&ReadAndMatchInput{
+					Reader:     file,
+					FlagConfig: &value.flagConfigIo,
+					Pattern:    value.SearchPattern,
 				})
 			}
 		})
 	}
+
+}
+
+var listDirTestCases = map[string]struct {
+	Directory string
+	Want      []string
+}{
+	"test_files": {
+		Directory: "test_files",
+		Want: []string{
+			"test_files/parent_dir1/child_dir1/child_dir1_file.txt",
+			"test_files/parent_dir1/child_dir2/child_dir2_file.txt",
+			"test_files/parent_dir2/parent_dir2_file1.txt",
+			"test_files/testfile.txt",
+			"test_files/testfile2.txt",
+		},
+	},
 }
 
 func TestWalk(t *testing.T) {
-	var listDirTests = map[string]struct {
-		Directory string
-		Want      []string
-	}{
-		"test_files": {
-			Directory: "test_files",
-			Want: []string{
-				"test_files/parent_dir1/child_dir1/child_dir1_file.txt",
-				"test_files/parent_dir1/child_dir2/child_dir2_file.txt",
-				"test_files/parent_dir2/parent_dir2_file1.txt",
-				"test_files/testfile.txt",
-				"test_files/testfile2.txt",
-			},
-		},
-	}
-
-	for key, value := range listDirTests {
+	for key, value := range listDirTestCases {
 		t.Run(key, func(t *testing.T) {
 			gotSubFiles, _, err := listFilesInDir(value.Directory)
 			if err != nil && !os.IsPermission(err) {
@@ -279,50 +334,45 @@ func TestWalk(t *testing.T) {
 	}
 }
 
-func TestBufferChecking(t *testing.T) {
-	tests := []struct {
-		name                string
-		dataBuffer          []string
-		lineNumber          int
-		linesPrintedMap     map[int]bool
-		expectedMatchResult []string
-	}{
-		{
-			name:                "Empty buffer",
-			dataBuffer:          []string{},
-			lineNumber:          5,
-			linesPrintedMap:     map[int]bool{},
-			expectedMatchResult: []string{},
-		},
-		{
-			name:                "Buffer with unprintedlines",
-			dataBuffer:          []string{"line1", "line2", "line3"},
-			lineNumber:          5,
-			linesPrintedMap:     map[int]bool{},
-			expectedMatchResult: []string{"line1", "line2", "line3"},
-		},
-		{
-			name:                "Buffer with some printed lines",
-			dataBuffer:          []string{"line1", "line2", "line3"},
-			lineNumber:          5,
-			linesPrintedMap:     map[int]bool{3: true},
-			expectedMatchResult: []string{"line1", "line3"},
-		},
-		{
-			name:                "Buffer with all lines printed",
-			dataBuffer:          []string{"line1", "line2", "line3"},
-			lineNumber:          5,
-			linesPrintedMap:     map[int]bool{4: true, 2: true, 3: true},
-			expectedMatchResult: []string{},
-		},
-	}
+var bufferTestCases = map[string]struct {
+	DataBuffer          []string
+	CurrentLine         int
+	LinesPrinted        map[int]bool
+	ExpectedMatchResult []string
+}{
+	"emptyBuffer": {
+		DataBuffer:          []string{},
+		CurrentLine:         5,
+		LinesPrinted:        map[int]bool{},
+		ExpectedMatchResult: []string{},
+	},
+	"bufferWithUnprintedLines": {
+		DataBuffer:          []string{"line1", "line2", "line3"},
+		CurrentLine:         5,
+		LinesPrinted:        map[int]bool{},
+		ExpectedMatchResult: []string{"line1", "line2", "line3"},
+	},
+	"bufferWithSomePrintedLines": {
+		DataBuffer:          []string{"line1", "line2", "line3"},
+		CurrentLine:         5,
+		LinesPrinted:        map[int]bool{3: true},
+		ExpectedMatchResult: []string{"line1", "line3"},
+	},
+	"bufferWithAllLinesPrinted": {
+		DataBuffer:          []string{"line1", "line2", "line3"},
+		CurrentLine:         5,
+		LinesPrinted:        map[int]bool{4: true, 2: true, 3: true},
+		ExpectedMatchResult: []string{},
+	},
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			matchResult := fetchResultFromBuffer(tt.lineNumber, tt.dataBuffer, tt.linesPrintedMap)
+func TestBufferForOptionB(t *testing.T) {
+	for key, value := range bufferTestCases {
+		t.Run(key, func(t *testing.T) {
+			matchResult := fetchResultFromBuffer(value.CurrentLine, value.DataBuffer, value.LinesPrinted)
 
-			if !reflect.DeepEqual(matchResult, tt.expectedMatchResult) {
-				t.Errorf("matchResult = %v, want %v", matchResult, tt.expectedMatchResult)
+			if !reflect.DeepEqual(matchResult, value.ExpectedMatchResult) {
+				t.Errorf("matchResult = %v, want %v", matchResult, value.ExpectedMatchResult)
 			}
 		})
 	}

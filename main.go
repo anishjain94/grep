@@ -10,7 +10,7 @@ import (
 func main() {
 	var pattern string
 
-	fileResultMap := FileResultMap{}
+	fileResult := FileResult{}
 	wg := &sync.WaitGroup{}
 
 	flagConfig := parseFlags()
@@ -26,7 +26,7 @@ func main() {
 		pattern = args[0]
 		sourceName := "stdin"
 
-		output, err := readAndMatch(&ReadAndMatchIo{
+		output, err := readAndMatch(&ReadAndMatchInput{
 			Reader:     os.Stdin,
 			FlagConfig: flagConfig,
 			Pattern:    pattern,
@@ -35,10 +35,10 @@ func main() {
 			log.Fatalf(err.Error())
 		}
 
-		fileResultMap[sourceName] = output
+		fileResult[sourceName] = output
 
-		displayResult(&DisplayResultIo{
-			matchedResultMap: fileResultMap,
+		displayResult(&DisplayResultInput{
+			MatchedResult:    fileResult,
 			FlagConfig:       flagConfig,
 			FilesInDirectory: []string{sourceName},
 			IsDirectory:      false,
@@ -50,19 +50,23 @@ func main() {
 		pattern = args[0]
 		filePath := args[1]
 
-		if err := validateFile(filePath); err != nil {
+		if _, err := os.Stat(filePath); err != nil {
 			log.Fatalf(err.Error())
 		}
 
 		filesToBeSearched, isDirectory, err := listFilesInDir(filePath)
+
+		if isDirectory && !flagConfig.ResurciveSearch {
+			log.Fatalf("%s Is a directory", filePath)
+		}
 
 		//we do not what our program to error out and exit completely incase we encounter file permission error
 		if err != nil && !os.IsPermission(err) {
 			log.Fatalf(err.Error())
 		}
 
-		jobsChannel := make(chan string, numOfWorkers)
-		resultChannel := make(chan FileResultMap, numOfWorkers) // Keeping a map here to make the output consisent with multiple goroutines.
+		jobs := make(chan string, numOfWorkers)
+		results := make(chan FileResult, numOfWorkers) // Keeping a map here to make the output consisent with multiple goroutines.
 
 		// if files to search is less than numOfWorkers then only spin up that no of goroutines..
 		if len(filesToBeSearched) < numOfWorkers {
@@ -70,23 +74,23 @@ func main() {
 		}
 
 		for range numOfWorkers {
-			go worker(jobsChannel, resultChannel, flagConfig, pattern)
+			go worker(jobs, results, flagConfig, pattern)
 		}
 
 		wg.Add(len(filesToBeSearched))
 		for _, file := range filesToBeSearched {
-			jobsChannel <- file
+			jobs <- file
 		}
 
-		close(jobsChannel)
+		close(jobs)
 		go func() {
 			wg.Wait()
-			close(resultChannel)
+			close(results)
 		}()
 
-		fileResultMap = collectResult(resultChannel, wg)
-		displayResult(&DisplayResultIo{
-			matchedResultMap: fileResultMap,
+		fileResult = collectResult(results, wg)
+		displayResult(&DisplayResultInput{
+			MatchedResult:    fileResult,
 			FlagConfig:       flagConfig,
 			FilesInDirectory: filesToBeSearched,
 			IsDirectory:      isDirectory,
@@ -94,54 +98,56 @@ func main() {
 	}
 }
 
-func parseFlags() *GrepConfigIo {
+func parseFlags() *GrepConfig {
+	countOfLinesAfterMatch := flag.Int("A", 0, "displays n lines after the match")
+	countOfLinesBeforeMatch := flag.Int("B", 0, "displays n lines before the match")
+	countOfMatches := flag.Bool("c", false, "displays count of matches instead of actual matched lines")
 	caseInsensitiveSearch := flag.Bool("i", false, "case insensitive search")
 	outputFileName := flag.String("o", "", "output file")
-	countOfMatches := flag.Bool("c", false, "displays count of matches instead of actual matched lines")
-	countOfLinesBeforeMatch := flag.Int("B", 0, "displays n lines before the match")
-	countOfLinesAfterMatch := flag.Int("A", 0, "displays n lines after the match")
+	recurviceSearch := flag.Bool("r", false, "search in a directory")
 
 	flag.Parse()
-	flagConfig := &GrepConfigIo{
+	flagConfig := &GrepConfig{
 		CaseInsensitiveSearch:   *caseInsensitiveSearch,
 		OutputFileName:          *outputFileName,
 		CountOfMatches:          *countOfMatches,
 		CountOfLinesBeforeMatch: *countOfLinesBeforeMatch,
 		CountOfLinesAfterMatch:  *countOfLinesAfterMatch,
+		ResurciveSearch:         *recurviceSearch,
 	}
 	return flagConfig
 }
 
-func collectResult(result <-chan FileResultMap, wg *sync.WaitGroup) FileResultMap {
-	fileResultMap := FileResultMap{}
+func collectResult(result <-chan FileResult, wg *sync.WaitGroup) FileResult {
+	fileResult := FileResult{}
 	for outputFromFiles := range result {
 		for key, value := range outputFromFiles {
-			fileResultMap[key] = value
+			fileResult[key] = value
 		}
 		wg.Done()
 	}
 
-	return fileResultMap
+	return fileResult
 }
 
-func worker(filePaths <-chan string, result chan<- FileResultMap, flagConfig *GrepConfigIo, searchStr string) {
+func worker(filePaths <-chan string, result chan<- FileResult, flagConfig *GrepConfig, searchStr string) {
 	for filePath := range filePaths {
 		matchedLines, err := executeGrep(filePath, flagConfig, searchStr)
 		if err != nil {
 			log.Println(err.Error())
 		}
-		result <- FileResultMap{filePath: matchedLines}
+		result <- FileResult{filePath: matchedLines}
 	}
 }
 
-func executeGrep(subFileName string, flagconfig *GrepConfigIo, searchStr string) ([]string, error) {
+func executeGrep(subFileName string, flagconfig *GrepConfig, searchStr string) ([]string, error) {
 	file, err := os.Open(subFileName)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	fileResult, err := readAndMatch(&ReadAndMatchIo{
+	fileResult, err := readAndMatch(&ReadAndMatchInput{
 		Reader:     file,
 		FlagConfig: flagconfig,
 		Pattern:    searchStr,

@@ -4,16 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-func readAndMatch(dataConfigIo *ReadAndMatchIo) ([]string, error) {
+func readAndMatch(dataConfigIo *ReadAndMatchInput) ([]string, error) {
 	var matchResult []string
 	scanner := bufio.NewScanner(dataConfigIo.Reader)
-	linesPrintedMap := map[int]bool{}
+	linesPrinted := map[int]bool{}
 	lineNumber := 0
 	pattern := dataConfigIo.Pattern
 	dataBuffer := make([]string, 0, dataConfigIo.FlagConfig.CountOfLinesBeforeMatch)
@@ -34,19 +36,19 @@ func readAndMatch(dataConfigIo *ReadAndMatchIo) ([]string, error) {
 
 		if linesToPrintAfterMatches > 0 {
 			matchResult = append(matchResult, inputStr)
-			linesPrintedMap[lineNumber] = true
+			linesPrinted[lineNumber] = true
 			linesToPrintAfterMatches--
 		}
 		if re.MatchString(inputStr) {
 			// Storing lines before the match for -b option
 			if dataConfigIo.FlagConfig.shouldDisplayLinesBeforeMatch() {
-				matchResult = append(matchResult, fetchResultFromBuffer(lineNumber, dataBuffer, linesPrintedMap)...)
+				matchResult = append(matchResult, fetchResultFromBuffer(lineNumber, dataBuffer, linesPrinted)...)
 			}
 
 			// Storing the matching line if not printed already
-			if !linesPrintedMap[lineNumber] {
+			if !linesPrinted[lineNumber] {
 				matchResult = append(matchResult, inputStr)
-				linesPrintedMap[lineNumber] = true
+				linesPrinted[lineNumber] = true
 			}
 
 			// Storing lines after the match for -a option
@@ -72,19 +74,19 @@ func readAndMatch(dataConfigIo *ReadAndMatchIo) ([]string, error) {
 	return matchResult, nil
 }
 
-func fetchResultFromBuffer(lineNumber int, dataBuffer []string, linesPrintedMap map[int]bool) []string {
+func fetchResultFromBuffer(lineNumber int, dataBuffer []string, linesPrinted map[int]bool) []string {
 	results := make([]string, 0, len(dataBuffer))
 	bufferStartIndex := lineNumber - len(dataBuffer)
 	for i, bufferedLine := range dataBuffer {
-		if !linesPrintedMap[bufferStartIndex+i] {
+		if !linesPrinted[bufferStartIndex+i] {
 			results = append(results, bufferedLine)
-			linesPrintedMap[bufferStartIndex+i] = true
+			linesPrinted[bufferStartIndex+i] = true
 		}
 	}
 	return results
 }
 
-func displayResult(dataIo *DisplayResultIo) error {
+func displayResult(dataIo *DisplayResultInput) error {
 	var writer io.Writer = os.Stdout
 
 	if dataIo.FlagConfig.shouldStoreOutput() {
@@ -99,14 +101,14 @@ func displayResult(dataIo *DisplayResultIo) error {
 
 	for _, filePath := range dataIo.FilesInDirectory {
 		if dataIo.FlagConfig.shouldShowCount() {
-			valueToPrint := strconv.Itoa(len(dataIo.matchedResultMap[filePath]))
+			valueToPrint := strconv.Itoa(len(dataIo.MatchedResult[filePath]))
 			if dataIo.IsDirectory {
 				valueToPrint = filePath + ": " + valueToPrint
 			}
 			fmt.Fprintln(writer, valueToPrint)
 			continue
 		}
-		for _, value := range dataIo.matchedResultMap[filePath] {
+		for _, value := range dataIo.MatchedResult[filePath] {
 			valueToPrint := value
 			if dataIo.IsDirectory {
 				valueToPrint = filePath + ": " + value
@@ -115,4 +117,27 @@ func displayResult(dataIo *DisplayResultIo) error {
 		}
 	}
 	return nil
+}
+
+func listFilesInDir(path string) ([]string, bool, error) {
+	var subFiles []string
+	var isDir bool
+
+	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			subFiles = append(subFiles, path)
+		} else {
+			isDir = true
+		}
+		return nil
+	})
+
+	if err != nil {
+		return subFiles, isDir, err //To not error out and exit completely incase we encounter file permission error
+	}
+
+	return subFiles, isDir, nil
 }

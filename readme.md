@@ -113,13 +113,18 @@ test_files/testfile2.txt: this is line 15
 test_files/testfile2.txt: this is line 16
 ```
 
-<!--
 - [x] Ability to print count of matches using `-c` flag
 
 ```
-$ grep -c anish grep/test_files/parent_dir1/child_dir1/child_dir1_file.txt
+$ ./grep -c anish test_files/parent_dir1/child_dir1/child_dir1_file.txt
 ```
 
 ```
 3
-``` -->
+```
+
+### Future Todo's
+
+- Handle for condition when file limit opening is restricted by os. make is os independent.
+- Load test and benchmarking grep
+- Add other options from `GREP`
