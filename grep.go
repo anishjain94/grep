@@ -51,14 +51,14 @@ func readAndMatch(dataConfigIo *ReadAndMatchInput) ([]string, error) {
 				linesPrinted[lineNumber] = true
 			}
 
-			// Storing lines after the match for -a option
+			// Storing lines after the match for -A option
 			if dataConfigIo.FlagConfig.shouldDisplayLinesAfterMatch() {
 				linesToPrintAfterMatches = dataConfigIo.FlagConfig.CountOfLinesAfterMatch
 			}
 			dataBuffer = []string{}
 		}
 
-		// Maintaining a buffer of lines before the match for -b option
+		// Maintaining a buffer of lines before the match for -B option
 		if dataConfigIo.FlagConfig.shouldDisplayLinesBeforeMatch() {
 			if len(dataBuffer) == dataConfigIo.FlagConfig.CountOfLinesBeforeMatch {
 				dataBuffer = dataBuffer[1:]

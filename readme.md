@@ -83,10 +83,10 @@ test_files/testfile2.txt: this is test 8
 test_files/testfile2.txt: this is test 14
 ```
 
-- [x] Ability to print n lines before using `-b` flag
+- [x] Ability to print n lines before using `-B` flag
 
 ```
-$ ./grep -b 2 test test_files
+$ ./grep -B 2 test test_files
 ```
 
 ```
@@ -98,10 +98,10 @@ test_files/testfile2.txt: this is line 13
 test_files/testfile2.txt: this is test 14
 ```
 
-- [x] Ability to print n lines after using `-a` flag
+- [x] Ability to print n lines after using `-A` flag
 
 ```
-$ ./grep -a 2 test test_files
+$ ./grep -A 2 test test_files
 ```
 
 ```
@@ -128,3 +128,4 @@ $ ./grep -c anish test_files/parent_dir1/child_dir1/child_dir1_file.txt
 - Handle for condition when file limit opening is restricted by os. make is os independent.
 - Load test and benchmarking grep
 - Add other options from `GREP`
+- Handle interrupt signals

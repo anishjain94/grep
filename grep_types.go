@@ -33,6 +33,7 @@ func (flagConfig *GrepConfig) shouldStoreOutput() bool {
 	return flagConfig != nil && flagConfig.OutputFileName != ""
 }
 
+// TODO: Ask mohit, do i make first letter lowercase, since we are not exporting or using it in other modules. 
 type DisplayResultInput struct {
 	MatchedResult    map[string][]string
 	FlagConfig       *GrepConfig
