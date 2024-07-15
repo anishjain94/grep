@@ -10,7 +10,7 @@ type GrepConfig struct {
 	CountOfLinesBeforeMatch int    //displays n lines before the match
 	CountOfLinesAfterMatch  int    //displays n lines after the match
 	OutputFileName          string //output file
-	ResurciveSearch         bool   //search in a directory
+	ResursiveSearch         bool   //search in a directory
 }
 
 func (flagConfig *GrepConfig) shouldDisplayLinesBeforeMatch() bool {

@@ -56,7 +56,7 @@ func main() {
 
 		filesToBeSearched, isDirectory, err := listFilesInDir(filePath)
 
-		if isDirectory && !flagConfig.ResurciveSearch {
+		if isDirectory && !flagConfig.ResursiveSearch {
 			log.Fatalf("%s Is a directory", filePath)
 		}
 
@@ -113,7 +113,7 @@ func parseFlags() *GrepConfig {
 		CountOfMatches:          *countOfMatches,
 		CountOfLinesBeforeMatch: *countOfLinesBeforeMatch,
 		CountOfLinesAfterMatch:  *countOfLinesAfterMatch,
-		ResurciveSearch:         *recurviceSearch,
+		ResursiveSearch:         *recurviceSearch,
 	}
 	return flagConfig
 }

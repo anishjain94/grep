@@ -84,7 +84,7 @@ var grepTestCases = map[string]struct {
 		},
 		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch: false,
-			ResurciveSearch:       true,
+			ResursiveSearch:       true,
 		},
 	},
 	"nLinesBefore": {
@@ -140,7 +140,7 @@ var grepTestCases = map[string]struct {
 			CaseInsensitiveSearch:   true,
 			CountOfLinesBeforeMatch: 2,
 			CountOfLinesAfterMatch:  1,
-			ResurciveSearch:         true,
+			ResursiveSearch:         true,
 		},
 	},
 	"multipleFlagsTwo": {
@@ -159,7 +159,7 @@ var grepTestCases = map[string]struct {
 		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch:   true,
 			CountOfLinesBeforeMatch: 2,
-			ResurciveSearch:         true,
+			ResursiveSearch:         true,
 		},
 	},
 	"multipleFlagsThree": {
@@ -178,7 +178,7 @@ var grepTestCases = map[string]struct {
 		flagConfigIo: GrepConfig{
 			CaseInsensitiveSearch:  true,
 			CountOfLinesAfterMatch: 2,
-			ResurciveSearch:        true,
+			ResursiveSearch:        true,
 		},
 	},
 }
