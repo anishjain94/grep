@@ -8,7 +8,6 @@ Write a command line program that implements Unix command `grep` like functional
 
 https://github.com/user-attachments/assets/61de835e-db48-450f-9026-4e1f9872c863
 
-
 #### Features required and status
 
 - [x] Ability to search for a string in a file
@@ -114,6 +113,7 @@ test_files/testfile2.txt: this is line 15
 test_files/testfile2.txt: this is line 16
 ```
 
+<!--
 - [x] Ability to print count of matches using `-c` flag
 
 ```
@@ -122,4 +122,4 @@ $ grep -c anish grep/test_files/parent_dir1/child_dir1/child_dir1_file.txt
 
 ```
 3
-```
+``` -->

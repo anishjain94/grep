@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 	"testing"
-	"unsafe"
 )
 
 // TODO: write seperate test files for there spefici files/modules..
@@ -250,49 +249,34 @@ func BenchmarkTableRegex(b *testing.B) {
 }
 
 func TestWalk(t *testing.T) {
-	subFiles, _, err := listFilesInDir("test_files")
-	if err != nil && !os.IsPermission(err) {
-		log.Fatalf(err.Error())
-	}
-	fmt.Println(subFiles)
-}
-
-func estimateFileResultMapSize(m FileResultMap) uintptr {
-	var size uintptr
-
-	// Size of map structure itself
-	size += unsafe.Sizeof(m)
-
-	// Iterate through the map to calculate size of contents
-	for k, v := range m {
-		// Size of key (string)
-		size += unsafe.Sizeof(k)
-		size += uintptr(len(k))
-
-		// Size of value ([]string)
-		size += unsafe.Sizeof(v)
-
-		// Size of each string in the slice
-		for _, s := range v {
-			size += unsafe.Sizeof(s)
-			size += uintptr(len(s))
-		}
+	var listDirTests = map[string]struct {
+		Directory string
+		Want      []string
+	}{
+		"test_files": {
+			Directory: "test_files",
+			Want: []string{
+				"test_files/parent_dir1/child_dir1/child_dir1_file.txt",
+				"test_files/parent_dir1/child_dir2/child_dir2_file.txt",
+				"test_files/parent_dir2/parent_dir2_file1.txt",
+				"test_files/testfile.txt",
+				"test_files/testfile2.txt",
+			},
+		},
 	}
 
-	return size
-}
+	for key, value := range listDirTests {
+		t.Run(key, func(t *testing.T) {
+			gotSubFiles, _, err := listFilesInDir(value.Directory)
+			if err != nil && !os.IsPermission(err) {
+				log.Fatalf(err.Error())
+			}
 
-func TestMem(t *testing.T) {
-
-	resultChannel := make(chan FileResultMap, 10000)
-	fmt.Println(resultChannel)
-	fmt.Println(unsafe.Sizeof(resultChannel))
-
-	resultChannel <- FileResultMap{"ads": []string{"temp"}}
-	resultChannel <- FileResultMap{"ad1": []string{"temp"}}
-	resultChannel <- FileResultMap{"ad2": []string{"temp"}}
-
-	fmt.Println(estimateFileResultMapSize(<-resultChannel))
+			if !reflect.DeepEqual(gotSubFiles, value.Want) {
+				t.Errorf("got %s \n --- want %s ", gotSubFiles, value.Want)
+			}
+		})
+	}
 }
 
 func TestBufferChecking(t *testing.T) {
